@@ -181,7 +181,7 @@ def parse_args():
     p.add_argument("--pretrain_checkpoint", default="./checkpoints/pretrain_checkpoint.pt")
     p.add_argument("--epochs",        type=int,   default=3)
     p.add_argument("--batch_size",    type=int,   default=16)
-    p.add_argument("--lr",            type=float, default=1e-4)
+    p.add_argument("--lr",            type=float, default=5e-4)
     p.add_argument("--train_samples", type=int,   default=6000)
     p.add_argument("--val_samples",   type=int,   default=500)
     p.add_argument("--grad_accum",    type=int,   default=2)

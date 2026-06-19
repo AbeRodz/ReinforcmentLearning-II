@@ -22,7 +22,7 @@ import torch
 import torch.nn.functional as F
 
 from dataset import TriviaQAGRPODataset, load_trivia_qa
-from grpo import compute_reward, generate_group, moving_average
+from grpo import compute_reward_f1 as compute_reward, generate_group, moving_average
 from model import GPTConfig, TinyGPT, load_tokenizer
 
 
@@ -88,7 +88,7 @@ def evaluate_model(
                 "question":  item["question"],
                 "expected":  item["answers"][0],
                 "generated": generated.strip(),
-                "correct":   reward == 1.0,
+                "correct":   reward > 0.0,
             })
 
     accuracy = float(np.mean(rewards))

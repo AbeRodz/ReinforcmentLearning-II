@@ -57,13 +57,40 @@ def get_device() -> str:
 
 # ── Reward ────────────────────────────────────────────────────────────────────
 
-def compute_reward(generated_text: str, answer_aliases: list[str]) -> float:
-    """
-    Binary exact-match reward: 1.0 if any known answer appears in the generation.
-    Case-insensitive substring match — same metric used in standard TriviaQA eval.
-    """
+def compute_reward_exact(generated_text: str, answer_aliases: list[str]) -> float:
+    """Binary: 1.0 if any answer appears as a substring, else 0.0."""
     gen = generated_text.lower().strip()
     return 1.0 if any(a.lower().strip() in gen for a in answer_aliases) else 0.0
+
+
+_ARTICLES = {"a", "an", "the"}
+_PUNCT = set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
+
+def _normalize(text: str) -> list[str]:
+    text = text.lower().strip()
+    text = "".join(c if c not in _PUNCT else " " for c in text)
+    return [t for t in text.split() if t not in _ARTICLES]
+
+
+def compute_reward_f1(generated_text: str, answer_aliases: list[str]) -> float:
+    """SQuAD-style token F1: strips punctuation and articles before matching."""
+    gen_tokens = _normalize(generated_text)
+    if not gen_tokens:
+        return 0.0
+    gen_set = set(gen_tokens)
+    best = 0.0
+    for alias in answer_aliases:
+        ref_tokens = _normalize(alias)
+        if not ref_tokens:
+            continue
+        ref_set = set(ref_tokens)
+        overlap = len(gen_set & ref_set)
+        if overlap == 0:
+            continue
+        p = overlap / len(gen_tokens)
+        r = overlap / len(ref_tokens)
+        best = max(best, 2 * p * r / (p + r))
+    return best
 
 
 # ── Generation (no grad) ──────────────────────────────────────────────────────
@@ -217,11 +244,13 @@ def train_grpo(
     temperature: float = 0.8,     # sampling temperature
     lr: float = 1e-5,             # lower than SFT — fine-tuning
     kl_coeff: float = 0.1,        # weight of the KL penalty term
+    reward: str = "f1",           # "exact" or "f1"
     save_dir: str = "./checkpoints",
     device: str | None = None,
 ) -> TinyGPT:
     device = device or get_device()
-    print(f"[GRPO] device: {device}")
+    reward_fn = compute_reward_f1 if reward == "f1" else compute_reward_exact
+    print(f"[GRPO] device: {device}  reward: {reward}")
 
     # ── Tokenizer ─────────────────────────────────────────────────────────────
     print("[GRPO] Loading tokenizer …")
@@ -305,7 +334,7 @@ def train_grpo(
                 for i in range(G)
             ]
             rewards = torch.tensor(
-                [compute_reward(t, item["answers"]) for t in texts],
+                [reward_fn(t, item["answers"]) for t in texts],
                 dtype=torch.float32,
                 device=device,
             )  # (G,)
@@ -406,6 +435,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lr", type=float, default=1e-5)
     p.add_argument("--kl_coeff", type=float, default=0.1,
                    help="Weight of the KL penalty (higher = stay closer to SFT)")
+    p.add_argument("--reward", type=str, default="f1", choices=["exact", "f1"],
+                   help="Reward function: 'exact' (binary) or 'f1' (token-level F1)")
     p.add_argument("--save_dir", type=str, default="./checkpoints")
     return p.parse_args()
 
@@ -421,5 +452,6 @@ if __name__ == "__main__":
         temperature=args.temperature,
         lr=args.lr,
         kl_coeff=args.kl_coeff,
+        reward=args.reward,
         save_dir=args.save_dir,
     )

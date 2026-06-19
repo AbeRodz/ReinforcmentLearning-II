@@ -126,7 +126,7 @@ def pretrain(
     raw_model = model
     if device == "cuda":
         try:
-            model = torch.compile(model)
+            #model = torch.compile(model)
             raw_model = model._orig_mod
             print("[PRETRAIN] torch.compile enabled")
         except Exception as e:
@@ -143,10 +143,11 @@ def pretrain(
           f"→ {len(train_ds)//batch_size:,} batches/epoch")
 
     pin = device == "cuda"
+    nw = 4 if device == "cuda" else 0
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                              num_workers=0, pin_memory=pin, drop_last=True)
+                              num_workers=nw, pin_memory=pin, drop_last=True)
     val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
-                              num_workers=0, pin_memory=pin)
+                              num_workers=nw, pin_memory=pin)
 
     # ── Optimiser & scheduler ─────────────────────────────────────────────────
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=0.01)

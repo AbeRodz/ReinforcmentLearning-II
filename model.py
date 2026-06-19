@@ -31,9 +31,9 @@ def load_tokenizer() -> AutoTokenizer:
 @dataclass
 class GPTConfig:
     block_size: int = 128       # max sequence length in tokens
-    n_embd: int = 256           # embedding dimension
+    n_embd: int = 512           # embedding dimension
     n_head: int = 8             # number of attention heads
-    n_layer: int = 4            # number of transformer blocks
+    n_layer: int = 6            # number of transformer blocks
     dropout: float = 0.2        # 0.1 caused memorisation with <150k tokens
     vocab_size: int = 32000     # Mistral tokenizer vocab size
     bias: bool = True
